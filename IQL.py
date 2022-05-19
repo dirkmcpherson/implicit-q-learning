@@ -242,7 +242,7 @@ class IQL(object):
 
     def save(self, filename):
         torch.save(self.value.state_dict(), filename + "_value")
-        torch.save(self.value.state_dict(), filename + "_value_optimizer")
+        torch.save(self.value_optimizer.state_dict(), filename + "_value_optimizer")
 
         torch.save(self.critic.state_dict(), filename + "_critic")
         torch.save(self.critic_optimizer.state_dict(), filename + "_critic_optimizer")
@@ -251,6 +251,7 @@ class IQL(object):
         torch.save(self.actor_optimizer.state_dict(), filename + "_actor_optimizer")
 
     def load(self, filename):
+        print(f"Loading from {filename}")
         self.value.load_state_dict(torch.load(filename + "_value"))
         self.value_optimizer.load_state_dict(torch.load(filename + "_value_optimizer"))
 

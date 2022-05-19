@@ -36,7 +36,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     # Experiment
     parser.add_argument("--policy", default="IQL")  # Policy name
-    parser.add_argument("--data_path", default="path\to\your\dataset")  # Path to data folder
+    parser.add_argument("--data_path", default="/home/j/.d4rl/datasets")  # Path to data folder
     parser.add_argument("--env", default="walker2d-bullet-medium-v0")  # OpenAI gym environment name
     parser.add_argument("--seed", default=1, type=int)  # Sets Gym, PyTorch and Numpy seeds
     parser.add_argument("--eval_freq", default=1e4, type=int)  # How often (time steps) we evaluate
@@ -110,7 +110,7 @@ if __name__ == "__main__":
     else:
         mean, std = 0, 1
 
-    n_epochs = int(args.max_timesteps) // int(args.eval_freq)
+    n_epochs = 2 #int(args.max_timesteps) // int(args.eval_freq)
     evaluations = []
     eval = eval_policy(policy, args.env, args.seed, mean, std)
     print('initial eval: {}'.format(eval))
