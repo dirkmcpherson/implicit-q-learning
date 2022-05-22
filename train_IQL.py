@@ -110,7 +110,7 @@ if __name__ == "__main__":
     else:
         mean, std = 0, 1
 
-    n_epochs = 2 #int(args.max_timesteps) // int(args.eval_freq)
+    n_epochs = int(args.max_timesteps) // int(args.eval_freq)
     evaluations = []
     eval = eval_policy(policy, args.env, args.seed, mean, std)
     print('initial eval: {}'.format(eval))

@@ -15,7 +15,7 @@ from IPython import embed
 
 # Runs policy for X episodes and returns average reward
 # A fixed seed is used for the eval environment
-def eval_policy(policy, env_name, seed, mean, std, seed_offset=0, eval_episodes=20, render=False):
+def eval_policy(policy, env_name, seed, mean, std, seed_offset=0, eval_episodes=10, render=False):
     eval_env = gym.make(env_name, render=render)
     eval_env.seed(seed + seed_offset)
     policy.actor.eval()
@@ -43,7 +43,7 @@ if __name__ == "__main__":
     parser.add_argument("--data_path", default="/home/j/workspace/implicit-q-learning")  # Path to data folder
     parser.add_argument("--env", default="PandaPush-v2")  # OpenAI gym environment name
     parser.add_argument("--seed", default=1, type=int)  # Sets Gym, PyTorch and Numpy seeds
-    parser.add_argument("--eval_freq", default=1e4, type=int)  # How often (time steps) we evaluate
+    parser.add_argument("--eval_freq", default=1e3, type=int)  # How often (time steps) we evaluate
     parser.add_argument("--max_timesteps", default=5e3, type=int)  # Max time steps to run environment
     parser.add_argument("--save_model", action="store_true")  # Save model and optimizer parameters
     parser.add_argument("--load_model", default="default")  # Model load file name, "" doesn't load, "default" uses file_name
@@ -51,32 +51,22 @@ if __name__ == "__main__":
     parser.add_argument("--batch_size", default=256, type=int)  # Batch size for both actor and critic
     parser.add_argument("--discount", default=0.99)  # Discount factor
     parser.add_argument("--tau", default=0.005)  # Target network update rate
-    parser.add_argument("--expectile", default=0.8, type=float)  # Expectile parameter Tau
+    parser.add_argument("--expectile", default=0.7, type=float)  # Expectile parameter Tau
     parser.add_argument("--beta", default=3.0)  # Temperature parameter Beta
     parser.add_argument("--max_weight", default=100.0)  # Max weight for actor update
     parser.add_argument("--normalize_data", default=True)
-    parser.add_argument("--skip_training", action="store_true")
     parser.add_argument("--run_slot", default=-1, type=int)
-    parser.add_argument("--deterministic", action="store_true")
 
     args = parser.parse_args()
 
-    if args.skip_training: [print("NOT TRAINING") for i in range(1000)]
-
-    default_slots = [1,2,3]
-    slots = [args.run_slot] if args.run_slot >= 0 else default_slots
-
-    # for i in range(5):
-    for i in slots:
-        comment = "skiptraining" if args.skip_training else "finetuning"
-        comment += f"_slot{i}_steps{int(args.max_timesteps)}"
-        comment += "_deterministic" if args.deterministic else ""
+    # for i in range(5)
+    for i in [0]:
+        comment = "ONLINE"
+        comment += f"_slot{i}"
         writer = SummaryWriter(comment=comment)
         
         file_name = f"{args.policy}_{args.env}_{args.seed}_round{i}"
-        save_file_name = file_name+"_finetuned"
-        save_file_name += "_skippedtraining" if args.skip_training else ""
-        save_file_name += "_deterministic" if args.deterministic else ""
+        save_file_name = file_name+"_ONLINE"
         print("---------------------------------------")
         print(f"Policy: {args.policy}, Env: {args.env}, Seed: {args.seed}")
         print("---------------------------------------")
@@ -116,33 +106,20 @@ if __name__ == "__main__":
             "actor_hidden": hidden,
             "critic_hidden": hidden,
             "value_hidden": hidden,
-            "deterministic_policy": args.deterministic,
             "finetuning": True,
         }
 
         # Initialize policy
         policy = IQL.IQL(**kwargs)
 
-        if args.load_model != "":
-            policy_file = file_name if args.load_model == "default" else args.load_model
-            print(f"Loading from {policy_file}")
-            policy.load(f"./models/{policy_file}")
-            # policy.actor.eval()
-
-        replay_buffer = utils.ReplayBuffer(state_dim, action_dim)
-        # dataset = h5py.File(os.path.join(args.data_path, args.env + '.hdf5'), 'r')
-        dataset = np.load(os.path.join(args.data_path, 'PandaPushv2_buffer.npz'))
-        replay_buffer.convert_npz(dataset)
-
-        print(f"Offline dataset size: {len(replay_buffer)}")
-
         # In the case of D4RL-Pybullet dataset, else use conver_D4RL method
         # replay_buffer.convert_D4RL_pybullet(dataset)
 
-        if args.normalize_data:
-            mean, std = replay_buffer.normalize_states() # all the states in the dataset are now normalized
-        else:
-            mean, std = 0, 1
+        ## How do we normalize the data without using a replay buffer?
+        # if args.normalize_data:
+        #     mean, std = replay_buffer.calculate_meanstd()
+        # else:
+        mean, std = 0, 1
 
         n_epochs = max(1, int(args.max_timesteps) // int(args.eval_freq))
         # all_evaluations = dict()
@@ -153,9 +130,7 @@ if __name__ == "__main__":
         '''
         Fill a new replay buffer with the last million samples of the old buffer
         '''
-        # finetuned_replay_buffer = utils.ReplayBuffer(state_dim, action_dim)
-        # finetuned_replay_buffer.add_dataset(replay_buffer.get_dataset_from_end(int(1e6)), num_samples=int(1e6))
-        # replay_buffer = finetuned_replay_buffer
+        replay_buffer = utils.ReplayBuffer(state_dim, action_dim)
 
         for epoch in range(n_epochs):
             range_gen = tqdm(
@@ -174,17 +149,11 @@ if __name__ == "__main__":
                 # state are stored non-normalized. We pull the mean,std from the offline batch
                 normalized_state = (np.array(state).reshape(1, -1) - mean) / std
                 action = policy.select_action(normalized_state)
-                # action = policy.select_action(state)
-
-                ## Add gaussian noise to the output (from IQL paper appendix)
-                action += np.random.normal(0, 0.03, action.shape)
 
                 next_state, reward, done, _ = env.step(action)
                 next_state = np.concatenate((next_state["observation"], next_state["desired_goal"]))
-                normalized_next_state = (np.array(next_state).reshape(1, -1) - mean) / std
 
-                replay_buffer.add(normalized_state, action, normalized_next_state, reward, done)                
-                # replay_buffer.add(state, action, next_state, reward, done)                
+                replay_buffer.add(state, action, next_state, reward, done)                
                 state = next_state
 
                 if done:
@@ -192,7 +161,7 @@ if __name__ == "__main__":
                     state = np.concatenate((state["observation"], state["desired_goal"]))
 
                 # if False:
-                if len(replay_buffer) > args.batch_size and not args.skip_training:
+                if len(replay_buffer) > args.batch_size:
                     val, q, value_loss, critic_loss, actor_loss = policy.train(replay_buffer, args.batch_size, mean, std)
                     info = policy.train(replay_buffer, args.batch_size)
                     # print(info)
@@ -202,8 +171,6 @@ if __name__ == "__main__":
                     mean_v_loss += info['value_loss']
                     mean_a_loss += info['actor_loss']
 
-                    # idx = epoch * args.eval_freq + itr
-                    # print(f"idx {idx}")
                     # for key, value in info.items():
                     #     all_evaluations[key] = all_evaluations.get(key, []) + [value]
 

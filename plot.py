@@ -4,15 +4,27 @@ import pickle
 from IPython import embed
 import matplotlib.pyplot as plt
 import pandas as pd
+import argparse
 
 epoch_scores_agg = []
 aggregate = dict()
 
-INCLUDE_FINETUNED = True
 
-for i in range(5):
+parser = argparse.ArgumentParser()
+parser.add_argument("--finetuned", action="store_true")
+parser.add_argument("--notes", default="")  # Model load file name, "" doesn't load, "default" uses file_name
+parser.add_argument("--no_training", action="store_true")
+args = parser.parse_args()
+
+INCLUDE_FINETUNED = args.finetuned
+
+n_runs = 3
+
+# for i in range(n_runs):
+for i in [2,3]:
     epoch_fn = f"./results/IQL_PandaPush-v2_1_round{i}.pickle"
     all_evals_fn = f"./results/all_IQL_PandaPush-v2_1_round{i}.pickle"
+    print(f"Adding results from {epoch_fn}")
 
     with open(epoch_fn, 'rb') as f:
         epoch_scores = pickle.load(f)
@@ -24,6 +36,8 @@ for i in range(5):
     if (INCLUDE_FINETUNED):
         epoch_fn = f"./results/IQL_PandaPush-v2_1_round{i}_finetuned.pickle"
         all_evals_fn = f"./results/all_IQL_PandaPush-v2_1_round{i}_finetuned.pickle"
+
+        print(f"   Adding finetuned results from {epoch_fn}")
 
         with open(epoch_fn, 'rb') as f:
             epoch_scores_finetuned = pickle.load(f)
@@ -39,7 +53,7 @@ for i in range(5):
         aggregate[key] = aggregate.get(key, []) + [np.array(value)]
 
 
-print(f"Found {len(epoch_scores_agg)} epochs")
+print(f"Found {len(epoch_scores_agg)} runs")
 epoch_scores_agg = np.array(epoch_scores_agg)
 
 def plot_with_stdv(data, xlabel, ylabel, title, use_ma = False, note=""):
@@ -47,15 +61,8 @@ def plot_with_stdv(data, xlabel, ylabel, title, use_ma = False, note=""):
     robot_stdv = np.std(data, axis=0)
     
     if (use_ma): # moving average
-        # ma = []
-        # cum_sum = np.cumsum(robot_data_avg)
-        # i = 1
-        # while i <= len(cum_sum):
-        #     ma.append(cum_sum[i-1] / i)
-        #     i += 1
-        # robot_data_avg = np.array(ma)
-
-        window_size = 10
+        print(f"Using moving average")
+        window_size = 50
         i = 0
         # Initialize an empty list to store moving averages
         moving_averages = []
@@ -101,12 +108,17 @@ def plot_with_stdv(data, xlabel, ylabel, title, use_ma = False, note=""):
     plt.ylabel(ylabel, fontsize="xx-large")
     plt.title(title, fontsize="xx-large")
 
-    plt.savefig(f"./plots/{title}_{note}.png")
-    plt.cla()
-# plt.show()
+    fn = f"./plots/{title}_{note}.png"
+    print(f"  writing plot to {fn}")
+    plt.savefig(fn)
+    # plt.cla()
+plt.show()
 
 note = "finetuned" if INCLUDE_FINETUNED else "offline"
-plot_with_stdv(epoch_scores_agg, "epoch", "Average Reward", "epoch_rewards_n5", note=note)
+# embed()
+plot_with_stdv(epoch_scores_agg, "epoch", "Average Reward", f"epoch_rewards_n{n_runs}", note=note)
+if (INCLUDE_FINETUNED):
+    plot_with_stdv(epoch_scores_finetuned, "epoch", "Average Reward", f"fintuned_epoch_rewards_n{n_runs}", note=note+args.notes)
 
 # for key, value in aggregate.items():
 #     data = np.array(value)

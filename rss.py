@@ -7,6 +7,7 @@ import d4rl_pybullet
 import h5py
 from tqdm import tqdm
 import panda_gym
+from torch.utils.tensorboard import SummaryWriter
 
 import pickle
 import utils
@@ -43,7 +44,7 @@ if __name__ == "__main__":
     parser.add_argument("--data_path", default="/home/j/workspace/implicit-q-learning")  # Path to data folder
     parser.add_argument("--env", default="PandaPush-v2")  # OpenAI gym environment name
     parser.add_argument("--seed", default=1, type=int)  # Sets Gym, PyTorch and Numpy seeds
-    parser.add_argument("--eval_freq", default=1e4, type=int)  # How often (time steps) we evaluate
+    parser.add_argument("--eval_freq", default=1e3, type=int)  # How often (time steps) we evaluate
     parser.add_argument("--max_timesteps", default=1e6, type=int)  # Max time steps to run environment
     parser.add_argument("--save_model", action="store_true")  # Save model and optimizer parameters
     parser.add_argument("--load_model", default="")  # Model load file name, "" doesn't load, "default" uses file_name
@@ -55,10 +56,19 @@ if __name__ == "__main__":
     parser.add_argument("--beta", default=3.0)  # Temperature parameter Beta
     parser.add_argument("--max_weight", default=100.0)  # Max weight for actor update
     parser.add_argument("--normalize_data", default=True)
+    parser.add_argument("--deterministic", action="store_true")
+
     args = parser.parse_args()
 
-    for i in range(5):
-        file_name = f"{args.policy}_{args.env}_{args.seed}_round{i}"
+    # for i in range(3):
+    trials = [0]
+
+    for i in trials:
+        comment = f"offline_round{i}_steps{int(args.max_timesteps)}"
+        comment += "_deterministic" if args.deterministic else ""
+        writer = SummaryWriter(comment=comment)
+        file_name = f"{args.policy}_{args.env}_{args.seed}_round{i}_nsteps_{int(args.max_timesteps)}"
+        file_name += "_deterministic" if args.deterministic else ""
         print("---------------------------------------")
         print(f"Policy: {args.policy}, Env: {args.env}, Seed: {args.seed}")
         print("---------------------------------------")
@@ -98,10 +108,18 @@ if __name__ == "__main__":
             "actor_hidden": hidden,
             "critic_hidden": hidden,
             "value_hidden": hidden,
+            "deterministic_policy": args.deterministic,
         }
 
         # Initialize policy
         policy = IQL.IQL(**kwargs)
+
+        
+        ## Compare loaded and live model weights
+        # policy.actor.state_dict()['trunk._fcs.0.weight'][0:10] 
+        # lpolicy = IQL.IQL(**kwargs)
+        # lpolicy.load(f"./test_models/{file_name}")
+        # lpolicy.actor.state_dict()['trunk._fcs.0.weight'][0:10]
 
         if args.load_model != "":
             policy_file = file_name if args.load_model == "default" else args.load_model
@@ -122,8 +140,8 @@ if __name__ == "__main__":
             mean, std = 0, 1
 
         n_epochs = max(1, int(args.max_timesteps) // int(args.eval_freq))
-        all_evaluations = dict()
-        evaluations = []
+        # all_evaluations = dict()
+        # evaluations = []
         eval = eval_policy(policy, args.env, args.seed, mean, std)
         print('initial eval: {}'.format(eval))
         for epoch in range(n_epochs):
@@ -144,11 +162,19 @@ if __name__ == "__main__":
                 mean_c_loss += info['critic_loss']
                 mean_v_loss += info['value_loss']
                 mean_a_loss += info['actor_loss']
-                for key, value in info.items():
-                    all_evaluations[key] = all_evaluations.get(key, []) + [value]
+                # for key, value in info.items():
+                #     all_evaluations[key] = all_evaluations.get(key, []) + [value]
 
             eval = eval_policy(policy, args.env, args.seed, mean, std)
-            evaluations.append(eval)
+
+
+            writer.add_scalar('value/value', mean_val / len(range_gen), epoch)
+            writer.add_scalar('value/qval', mean_q / len(range_gen), epoch)
+            writer.add_scalar('Loss/value_loss', mean_v_loss / len(range_gen), epoch)
+            writer.add_scalar('Loss/critic_loss', mean_c_loss / len(range_gen), epoch)
+            writer.add_scalar('Loss/actor_loss', mean_a_loss / len(range_gen), epoch)
+            writer.add_scalar("evaluations/eval", eval, epoch)
+            # evaluations.append(eval)
             policy.actor_scheduler.step()
             print('Epoch {}/{}: value: {:.3f}. Q: {:.3f}. value_loss: {:.3f}. critic_loss: {:.3f}. actor_loss: {:.3f} env: {:.2f}'.format(
                                                                                             epoch, n_epochs,
@@ -159,11 +185,16 @@ if __name__ == "__main__":
                                                                                             mean_a_loss / len(range_gen),
                                                                                             eval))
             
-            with open(f"./results/{file_name}.pickle", "wb") as f:
-                pickle.dump(evaluations, f)
-            with open(f"./results/all_{file_name}.pickle", "wb") as f:
-                pickle.dump(all_evaluations, f)
+            # with open(f"./results/{file_name}.pickle", "wb") as f:
+            #     pickle.dump(evaluations, f)
+            # with open(f"./results/all_{file_name}.pickle", "wb") as f:
+            #     pickle.dump(all_evaluations, f)
 
             # np.save(f"./results/{file_name}", evaluations)
             # np.save(f"./results/all_{file_name}", all_evaluations, allow_pickle=True)
-            if args.save_model: policy.save(f"./models/{file_name}")
+            if args.save_model:
+                print(f"Saving over {file_name}")
+                policy.save(f"./models/{file_name}")
+
+                # if (epoch == 4):
+                #     embed()

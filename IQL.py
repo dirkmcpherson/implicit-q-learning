@@ -6,7 +6,7 @@ import torch.nn.functional as F
 from torch import distributions as pyd
 import math
 from typing import List, Optional, Sequence
-
+from IPython import embed
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -130,6 +130,7 @@ class IQL(object):
             actor_hidden: Optional[Sequence[int]] = (256, 256),
             critic_hidden: Optional[Sequence[int]] = (256, 256),
             value_hidden: Optional[Sequence[int]] = (256, 256),
+            finetuning: bool = False,
     ):
         self.deterministic_policy = deterministic_policy
         if self.deterministic_policy:
@@ -155,6 +156,7 @@ class IQL(object):
         self.tau = tau
         self.normalize_advantage = normalize_advantage
         self.normalize_actor_loss = normalize_actor_loss
+        self.finetuning = finetuning
 
         self.total_it = 0
 
@@ -167,7 +169,7 @@ class IQL(object):
         action = torch.clip(out, -1, 1) * self.max_action
         return action.cpu().data.numpy().flatten()
 
-    def train(self, replay_buffer, batch_size=256):
+    def train(self, replay_buffer, batch_size=256, mean=0, std=1):
         self.total_it += 1
         self.actor.train()
         self.critic.train()
@@ -176,13 +178,15 @@ class IQL(object):
 
         # Sample replay buffer
         state, action, next_state, reward, not_done = replay_buffer.sample(batch_size)
-
+        # state, action, next_state, reward, not_done = replay_buffer.sample_normalized(batch_size, mean, std) if self.finetuning else replay_buffer.sample(batch_size)
+        
         # Compute value loss
         with torch.no_grad():
             self.critic_target.eval()
             target_q1, target_q2 = self.critic_target(state, action)
             target_q = torch.min(target_q1, target_q2)
         value = self.value(state)
+        # embed()
         value_loss = expectile_loss(target_q - value, expectile=self.expectile).mean()
 
         # Compute critic loss
