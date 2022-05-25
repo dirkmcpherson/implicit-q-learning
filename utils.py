@@ -111,8 +111,14 @@ class ReplayBuffer(object):
         self.not_done = 1. - dataset['terminals'][0:-1].reshape(-1, 1)
         self.size = self.state.shape[0]
 
-    def convert_npz(self, dataset):
-        # for key in dataset.keys(): print(key)
+    def convert_npz(self, dataset, hardcoded_desired_goal=None):
+        # # for key in dataset.keys(): print(key)
+        # if (hardcoded_desired_goal is not None):
+        #     print(f"Overriding all desired goals in replay buffer for known floor goal {hardcoded_desired_goal}.")
+        #     hardcoded_desired_goals = np.ones(dataset["desired_goals"].shape) * hardcoded_desired_goal
+        #     states = np.concatenate((dataset['states'], hardcoded_desired_goals), axis=1)
+        #     # embed()
+        # else:
         states = np.concatenate((dataset['states'], dataset["desired_goals"]), axis=1)
         self.state = states[0:-1]
         self.next_state = states[1:]

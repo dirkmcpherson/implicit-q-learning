@@ -43,18 +43,20 @@ if __name__ == "__main__":
     parser.add_argument("--data_path", default="/home/j/workspace/implicit-q-learning")  # Path to data folder
     parser.add_argument("--env", default="PandaPush-v2")  # OpenAI gym environment name
     parser.add_argument("--seed", default=1, type=int)  # Sets Gym, PyTorch and Numpy seeds
-    parser.add_argument("--eval_freq", default=1e3, type=int)  # How often (time steps) we evaluate
+    parser.add_argument("--eval_freq", default=1e4, type=int)  # How often (time steps) we evaluate
     parser.add_argument("--max_timesteps", default=5e3, type=int)  # Max time steps to run environment
     parser.add_argument("--save_model", action="store_true")  # Save model and optimizer parameters
     parser.add_argument("--load_model", default="default")  # Model load file name, "" doesn't load, "default" uses file_name
+    
     # IQL
     parser.add_argument("--batch_size", default=256, type=int)  # Batch size for both actor and critic
     parser.add_argument("--discount", default=0.99)  # Discount factor
     parser.add_argument("--tau", default=0.005)  # Target network update rate
-    parser.add_argument("--expectile", default=0.7, type=float)  # Expectile parameter Tau
+    parser.add_argument("--expectile", default=0.8, type=float)  # Expectile parameter Tau
     parser.add_argument("--beta", default=3.0)  # Temperature parameter Beta
     parser.add_argument("--max_weight", default=100.0)  # Max weight for actor update
     parser.add_argument("--normalize_data", default=True)
+    parser.add_argument("--deterministic", action="store_true")
     parser.add_argument("--run_slot", default=-1, type=int)
 
     args = parser.parse_args()
@@ -63,6 +65,7 @@ if __name__ == "__main__":
     for i in [0]:
         comment = "ONLINE"
         comment += f"_slot{i}"
+        comment += "_deterministic" if args.deterministic else ""
         writer = SummaryWriter(comment=comment)
         
         file_name = f"{args.policy}_{args.env}_{args.seed}_round{i}"
@@ -107,6 +110,7 @@ if __name__ == "__main__":
             "critic_hidden": hidden,
             "value_hidden": hidden,
             "finetuning": True,
+            "deterministic_policy": args.deterministic
         }
 
         # Initialize policy
@@ -147,8 +151,9 @@ if __name__ == "__main__":
             state = np.concatenate((state["observation"], state["desired_goal"]))
             for itr in range_gen:                
                 # state are stored non-normalized. We pull the mean,std from the offline batch
-                normalized_state = (np.array(state).reshape(1, -1) - mean) / std
-                action = policy.select_action(normalized_state)
+                # normalized_state = (np.array(state).reshape(1, -1) - mean) / std
+                # action = policy.select_action(normalized_state)
+                action = policy.select_action(state)
 
                 next_state, reward, done, _ = env.step(action)
                 next_state = np.concatenate((next_state["observation"], next_state["desired_goal"]))
@@ -162,7 +167,7 @@ if __name__ == "__main__":
 
                 # if False:
                 if len(replay_buffer) > args.batch_size:
-                    val, q, value_loss, critic_loss, actor_loss = policy.train(replay_buffer, args.batch_size, mean, std)
+                    # val, q, value_loss, critic_loss, actor_loss = policy.train(replay_buffer, args.batch_size, mean, std)
                     info = policy.train(replay_buffer, args.batch_size)
                     # print(info)
                     mean_val += info['value']

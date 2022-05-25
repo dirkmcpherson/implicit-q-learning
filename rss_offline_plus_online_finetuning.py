@@ -34,7 +34,6 @@ def eval_policy(policy, env_name, seed, mean, std, seed_offset=0, eval_episodes=
     print(f"Avg reward {avg_reward}")
     return avg_reward
 
-
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
@@ -43,7 +42,7 @@ if __name__ == "__main__":
     parser.add_argument("--data_path", default="/home/j/workspace/implicit-q-learning")  # Path to data folder
     parser.add_argument("--env", default="PandaPush-v2")  # OpenAI gym environment name
     parser.add_argument("--seed", default=1, type=int)  # Sets Gym, PyTorch and Numpy seeds
-    parser.add_argument("--eval_freq", default=1e4, type=int)  # How often (time steps) we evaluate
+    parser.add_argument("--eval_freq", default=1e3, type=int)  # How often (time steps) we evaluate
     parser.add_argument("--max_timesteps", default=5e3, type=int)  # Max time steps to run environment
     parser.add_argument("--save_model", action="store_true")  # Save model and optimizer parameters
     parser.add_argument("--load_model", default="default")  # Model load file name, "" doesn't load, "default" uses file_name
@@ -58,25 +57,29 @@ if __name__ == "__main__":
     parser.add_argument("--skip_training", action="store_true")
     parser.add_argument("--run_slot", default=-1, type=int)
     parser.add_argument("--deterministic", action="store_true")
+    parser.add_argument("--dump_buffer", action="store_true")
 
     args = parser.parse_args()
 
     if args.skip_training: [print("NOT TRAINING") for i in range(1000)]
 
-    default_slots = [1,2,3]
+    default_slots = [0,1,2,3,4,5,6] #,7]
     slots = [args.run_slot] if args.run_slot >= 0 else default_slots
 
     # for i in range(5):
     for i in slots:
+        args.seed = i
         comment = "skiptraining" if args.skip_training else "finetuning"
         comment += f"_slot{i}_steps{int(args.max_timesteps)}"
         comment += "_deterministic" if args.deterministic else ""
+        comment += "_dumpbuffer" if args.dump_buffer else ""
         writer = SummaryWriter(comment=comment)
         
         file_name = f"{args.policy}_{args.env}_{args.seed}_round{i}"
         save_file_name = file_name+"_finetuned"
         save_file_name += "_skippedtraining" if args.skip_training else ""
         save_file_name += "_deterministic" if args.deterministic else ""
+        save_file_name += "_dumpbuffer" if args.dump_buffer else ""
         print("---------------------------------------")
         print(f"Policy: {args.policy}, Env: {args.env}, Seed: {args.seed}")
         print("---------------------------------------")
@@ -103,7 +106,7 @@ if __name__ == "__main__":
         max_action = float(env.action_space.high[0])
 
         hidden = (256, 256)
-
+        print(f"MAX ACTION {max_action}")
         kwargs = {
             "state_dim": state_dim,
             "action_dim": action_dim,
@@ -123,6 +126,15 @@ if __name__ == "__main__":
         # Initialize policy
         policy = IQL.IQL(**kwargs)
 
+
+        # HACK to load from the right files
+        if (args.deterministic):
+            file_name += "_nsteps_310000_deterministic" if i in [6,7] else "_nsteps_300000_deterministic"
+        else:
+            file_name += "_nsteps_1000000"
+        print(f"WARN: modifying filename in line with known pretrained models! Adding {file_name}")
+        # HACK
+        
         if args.load_model != "":
             policy_file = file_name if args.load_model == "default" else args.load_model
             print(f"Loading from {policy_file}")
@@ -153,9 +165,13 @@ if __name__ == "__main__":
         '''
         Fill a new replay buffer with the last million samples of the old buffer
         '''
-        # finetuned_replay_buffer = utils.ReplayBuffer(state_dim, action_dim)
-        # finetuned_replay_buffer.add_dataset(replay_buffer.get_dataset_from_end(int(1e6)), num_samples=int(1e6))
-        # replay_buffer = finetuned_replay_buffer
+        if args.dump_buffer:
+            replay_buffer = utils.ReplayBuffer(state_dim, action_dim)
+            print(f"Dumping ENTIRE old buffer")
+            # print(f"Dumping part of old buffer")
+            # finetuned_replay_buffer = utils.ReplayBuffer(state_dim, action_dim)
+            # finetuned_replay_buffer.add_dataset(replay_buffer.get_dataset_from_end(int(5e5)), num_samples=int(5e5))
+            # replay_buffer = finetuned_replay_buffer
 
         for epoch in range(n_epochs):
             range_gen = tqdm(
@@ -193,7 +209,7 @@ if __name__ == "__main__":
 
                 # if False:
                 if len(replay_buffer) > args.batch_size and not args.skip_training:
-                    val, q, value_loss, critic_loss, actor_loss = policy.train(replay_buffer, args.batch_size, mean, std)
+                    # val, q, value_loss, critic_loss, actor_loss = policy.train(replay_buffer, args.batch_size, mean, std)
                     info = policy.train(replay_buffer, args.batch_size)
                     # print(info)
                     mean_val += info['value']

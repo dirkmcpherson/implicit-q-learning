@@ -56,20 +56,21 @@ class MLP(nn.Module):
             h = torch.cat([h, x], dim=1)
         return self._fcs[-1](h)
 
-
 class DiagGaussianActor(nn.Module):
     """torch.distributions implementation of an diagonal Gaussian policy."""
     def __init__(self, obs_dim, action_dim, log_std_bounds=(-10, 2), hidden=(256, 256)):
         super().__init__()
         self.log_std_bounds = log_std_bounds
         self.trunk = MLP(in_dim=obs_dim, out_dim=action_dim, hidden_units=hidden)
-        var_size = {"spherical": 1, "diagonal": action_dim}["spherical"]
+        # var_size = {"spherical": 1, "diagonal": action_dim}["spherical"]
+        var_size = {"spherical": 1, "diagonal": action_dim}["diagonal"]
         self.var_param = nn.Parameter(torch.tensor(np.broadcast_to(0, var_size), dtype=torch.float))
 
     def forward(self, obs):
         mu = self.trunk(obs)
         log_std_min, log_std_max = self.log_std_bounds
         log_stds = torch.clip(self.var_param, log_std_min, log_std_max)
+        # print(f"{torch.exp(log_stds)}")
         dist = torch.distributions.Independent(torch.distributions.Normal(loc=mu, scale=torch.exp(log_stds)), 1)
         return dist
 
