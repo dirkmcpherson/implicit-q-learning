@@ -32,6 +32,7 @@ def eval_policy(policy, env_name, seed, mean, std, seed_offset=0, eval_episodes=
             # if (HARDCODED_DESIRED_GOAL is not None):
             #     state = np.concatenate((state["observation"], HARDCODED_DESIRED_GOAL))
             # else:
+            # print(f"{state['desired_goal']}")
             state = np.concatenate((state["observation"], state["desired_goal"]))
             state = (np.array(state).reshape(1, -1) - mean) / std
             action = policy.select_action(state)
@@ -66,6 +67,7 @@ if __name__ == "__main__":
     parser.add_argument("--deterministic", action="store_true")
     parser.add_argument("--run_slot", type=int, default=-1)
     parser.add_argument("--altered", default=True)
+    parser.add_argument("--use_experimental_reward", action="store_true")
 
 
     args = parser.parse_args()
@@ -81,10 +83,12 @@ if __name__ == "__main__":
         comment = f"offline_round{i}_steps{int(args.max_timesteps)}"
         comment += "_deterministic" if args.deterministic else ""
         comment += "ALTERED" if args.altered else ""
+        comment += "expR" if args.use_experimental_reward else ""
         writer = SummaryWriter(comment=comment)
         file_name = f"{args.policy}_{args.env}_{args.seed}_round{i}_nsteps_{int(args.max_timesteps)}"
         file_name += "_deterministic" if args.deterministic else ""
         file_name += "ALTERED" if args.altered else ""
+        file_name += "expR" if args.use_experimental_reward else ""
         print("---------------------------------------")
         print(f"Policy: {args.policy}, Env: {args.env}, Seed: {args.seed}")
         print("---------------------------------------")
@@ -143,6 +147,8 @@ if __name__ == "__main__":
 
         replay_buffer = utils.ReplayBuffer(state_dim, action_dim)
         dataset_path = 'PandaPushv2_buffer_modified.npz' if args.altered else 'PandaPushv2_buffer.npz'
+        if args.use_experimental_reward:
+            dataset_path = 'PandaPushv2_buffer_modified_II.npz'
         print(f"Loading from {dataset_path}.")
         dataset = np.load(os.path.join(args.data_path, dataset_path))
 
@@ -153,7 +159,7 @@ if __name__ == "__main__":
         # In the case of D4RL-Pybullet dataset, else use conver_D4RL method
         # replay_buffer.convert_D4RL_pybullet(dataset)
 
-        embed()
+        # embed()
 
         if args.normalize_data:
             mean, std = replay_buffer.normalize_states()

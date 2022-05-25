@@ -35,7 +35,6 @@ def eval_policy(policy, env_name, seed, mean, std, seed_offset=0, eval_episodes=
     return avg_reward
 
 if __name__ == "__main__":
-
     parser = argparse.ArgumentParser()
     # Experiment
     parser.add_argument("--policy", default="IQL")  # Policy name
@@ -58,6 +57,8 @@ if __name__ == "__main__":
     parser.add_argument("--run_slot", default=-1, type=int)
     parser.add_argument("--deterministic", action="store_true")
     parser.add_argument("--dump_buffer", action="store_true")
+    parser.add_argument("--altered", default=True)
+    parser.add_argument("--use_experimental_reward", action="store_true")
 
     args = parser.parse_args()
 
@@ -73,6 +74,8 @@ if __name__ == "__main__":
         comment += f"_slot{i}_steps{int(args.max_timesteps)}"
         comment += "_deterministic" if args.deterministic else ""
         comment += "_dumpbuffer" if args.dump_buffer else ""
+        comment += "ALTERED" if args.altered else ""
+        comment += "expR" if args.use_experimental_reward else ""
         writer = SummaryWriter(comment=comment)
         
         file_name = f"{args.policy}_{args.env}_{args.seed}_round{i}"
@@ -80,6 +83,8 @@ if __name__ == "__main__":
         save_file_name += "_skippedtraining" if args.skip_training else ""
         save_file_name += "_deterministic" if args.deterministic else ""
         save_file_name += "_dumpbuffer" if args.dump_buffer else ""
+        save_file_name += "ALTERED" if args.altered else ""
+        save_file_name += "expR" if args.use_experimental_reward else ""
         print("---------------------------------------")
         print(f"Policy: {args.policy}, Env: {args.env}, Seed: {args.seed}")
         print("---------------------------------------")
@@ -129,9 +134,10 @@ if __name__ == "__main__":
 
         # HACK to load from the right files
         if (args.deterministic):
-            file_name += "_nsteps_310000_deterministic" if i in [6,7] else "_nsteps_300000_deterministic"
+            file_name += "_nsteps_300000_deterministic"
         else:
             file_name += "_nsteps_1000000"
+        file_name += "ALTERED" if args.altered else ""
         print(f"WARN: modifying filename in line with known pretrained models! Adding {file_name}")
         # HACK
         
@@ -142,10 +148,12 @@ if __name__ == "__main__":
             # policy.actor.eval()
 
         replay_buffer = utils.ReplayBuffer(state_dim, action_dim)
-        # dataset = h5py.File(os.path.join(args.data_path, args.env + '.hdf5'), 'r')
-        dataset = np.load(os.path.join(args.data_path, 'PandaPushv2_buffer.npz'))
+        dataset_path = 'PandaPushv2_buffer_modified.npz' if args.altered else 'PandaPushv2_buffer.npz'
+        if args.use_experimental_reward:
+            dataset_path = 'PandaPushv2_buffer_modified_II.npz'
+        print(f"Loading from {dataset_path}.")
+        dataset = np.load(os.path.join(args.data_path, dataset_path))
         replay_buffer.convert_npz(dataset)
-
         print(f"Offline dataset size: {len(replay_buffer)}")
 
         # In the case of D4RL-Pybullet dataset, else use conver_D4RL method
