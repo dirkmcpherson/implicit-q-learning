@@ -150,7 +150,7 @@ if __name__ == "__main__":
         replay_buffer = utils.ReplayBuffer(state_dim, action_dim)
         dataset_path = 'PandaPushv2_buffer_modified.npz' if args.altered else 'PandaPushv2_buffer.npz'
         if args.use_experimental_reward:
-            dataset_path = 'PandaPushv2_buffer_modified_II.npz'
+            dataset_path = 'PandaPushv2_buffer_modified_IIII.npz'
         print(f"Loading from {dataset_path}.")
         dataset = np.load(os.path.join(args.data_path, dataset_path))
         replay_buffer.convert_npz(dataset)
@@ -250,7 +250,6 @@ if __name__ == "__main__":
                                                                                             mean_a_loss / len(range_gen),
                                                                                             eval))
             
-            print(f"Writing to file {save_file_name}")
             
             # with open(f"./results/{save_file_name}.pickle", "wb") as f:
             #     pickle.dump(evaluations, f)
@@ -259,4 +258,6 @@ if __name__ == "__main__":
 
             # np.save(f"./results/{file_name}", evaluations)
             # np.save(f"./results/all_{file_name}", all_evaluations, allow_pickle=True)
-            if args.save_model: policy.save(f"./models/{save_file_name}")
+            if args.save_model: 
+                print(f"Writing to file {save_file_name}")
+                policy.save(f"./models/{save_file_name}")

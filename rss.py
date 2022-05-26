@@ -68,6 +68,8 @@ if __name__ == "__main__":
     parser.add_argument("--run_slot", type=int, default=-1)
     parser.add_argument("--altered", default=True)
     parser.add_argument("--use_experimental_reward", action="store_true")
+    parser.add_argument("--notes", default="")  # Model load file name, "" doesn't load, "default" uses file_name
+
 
 
     args = parser.parse_args()
@@ -84,11 +86,13 @@ if __name__ == "__main__":
         comment += "_deterministic" if args.deterministic else ""
         comment += "ALTERED" if args.altered else ""
         comment += "expR" if args.use_experimental_reward else ""
+        comment += args.notes
         writer = SummaryWriter(comment=comment)
         file_name = f"{args.policy}_{args.env}_{args.seed}_round{i}_nsteps_{int(args.max_timesteps)}"
         file_name += "_deterministic" if args.deterministic else ""
         file_name += "ALTERED" if args.altered else ""
         file_name += "expR" if args.use_experimental_reward else ""
+        file_name += args.notes
         print("---------------------------------------")
         print(f"Policy: {args.policy}, Env: {args.env}, Seed: {args.seed}")
         print("---------------------------------------")
@@ -146,9 +150,10 @@ if __name__ == "__main__":
             policy.load(f"./models/{policy_file}")
 
         replay_buffer = utils.ReplayBuffer(state_dim, action_dim)
-        dataset_path = 'PandaPushv2_buffer_modified.npz' if args.altered else 'PandaPushv2_buffer.npz'
-        if args.use_experimental_reward:
-            dataset_path = 'PandaPushv2_buffer_modified_II.npz'
+        dataset_path ='PandaPushv2_buffer_modified_trivial.npz'
+        # dataset_path = 'PandaPushv2_buffer_modified_I.npz' if args.altered else 'PandaPushv2_buffer.npz'
+        # if args.use_experimental_reward:
+        #     dataset_path = 'PandaPushv2_buffer_modified_IIII.npz'
         print(f"Loading from {dataset_path}.")
         dataset = np.load(os.path.join(args.data_path, dataset_path))
 

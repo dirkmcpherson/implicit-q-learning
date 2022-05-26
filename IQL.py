@@ -160,6 +160,9 @@ class IQL(object):
         self.finetuning = finetuning
 
         self.total_it = 0
+    
+    def reset_scheduler(self):
+        self.actor_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(self.actor_optimizer, T_max=100)
 
     def select_action(self, state):
         self.actor.eval()
