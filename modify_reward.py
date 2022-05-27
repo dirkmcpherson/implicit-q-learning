@@ -11,9 +11,9 @@ done_array = data['dones']
 
 
 done_true_idx = np.where(done_array == True)
-# desired_terminal_state = np.array([-0.1, 0.39,-0.38]) # desired object position
+desired_terminal_state = np.array([-0.1, 0.39,-0.38]) # desired object position
 # desired_terminal_state = np.array([-0.15, 0.15, 0.02]) # desired object position
-desired_terminal_state = np.array([0, 0, 0.02]) # desired object position
+# desired_terminal_state = np.array([0, 0, 0.02]) # desired object position
 done_true_idxs = done_true_idx[0]
 start_idx = 0 # to keep track of the steps
 r_max = 1 # should we modify this?
@@ -41,14 +41,10 @@ for done_idx in done_true_idxs:
         # l_next_to_goal = np.linalg.norm(desired_terminal_state - next_state)
         # # l_final_to_goal = np.linalg.norm(desired_terminal_state - terminal_state)
 
-        if l_curr_to_goal <= 0.05:
-            reward_array[i] = 0.1
-        elif l_curr_to_goal <= 0.1:
-            reward_array[i] = 0.05
-        elif l_curr_to_goal <= 0.15:
-            reward_array[i] = 0.025
+        if l_curr_to_goal <= 0.1:
+            reward_array[i] = 0.
         else:
-            reward_array[i] = -1
+            reward_array[i] = -1. 
 
         # if (l_final_to_goal < 0.2): # The trajectory brought the object to the goal, so this sample gets some human reward
         #     r = r_max
@@ -82,7 +78,7 @@ for done_idx in done_true_idxs:
 
 
 
-file_name = 'PandaPushv2_buffer_modified_trivial'
+file_name = 'PandaPushv2_buffer_modified_sparse'
 path_to_save =  file_name + '.npz'        
 # np.savez_compressed(path_to_save, states = state_array, actions = action_array, rewards = reward_array, dones = done_array, achieved_goals = data['achieved_goals'], desired_goals = data['desired_goals'])
 

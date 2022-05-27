@@ -12,7 +12,7 @@ import IQL
 import panda_gym
 from IPython import embed
 
-desired_terminal_state = np.array([0, 0, 0.02]) # desired object position
+# desired_terminal_state = np.array([0, 0, 0.02]) # desired object position
 
 # Runs policy for X episodes and returns average reward
 # A fixed seed is used for the eval environment
@@ -27,9 +27,9 @@ def eval_policy(policy, env_name, seed, mean, std, seed_offset=0, eval_episodes=
         ep_reward = 0
         state, done = eval_env.reset(), False
         while not done:
-            print(state)
-            state = np.concatenate((state["observation"], desired_terminal_state))
-            # state = np.concatenate((state["observation"], state["desired_goal"]))
+            # print(state)
+            # state = np.concatenate((state["observation"], desired_terminal_state))
+            state = np.concatenate((state["observation"], state["desired_goal"]))
             state = (np.array(state).reshape(1, -1) - mean) / std
             action = policy.select_action(state)
             state, reward, done, _ = eval_env.step(action)

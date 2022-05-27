@@ -150,7 +150,8 @@ if __name__ == "__main__":
         replay_buffer = utils.ReplayBuffer(state_dim, action_dim)
         dataset_path = 'PandaPushv2_buffer_modified.npz' if args.altered else 'PandaPushv2_buffer.npz'
         if args.use_experimental_reward:
-            dataset_path = 'PandaPushv2_buffer_modified_IIII.npz'
+            # dataset_path = 'PandaPushv2_buffer_modified_IIII.npz'
+            dataset_path = 'PandaPushv2_buffer_modified_sparse.npz'
         print(f"Loading from {dataset_path}.")
         dataset = np.load(os.path.join(args.data_path, dataset_path))
         replay_buffer.convert_npz(dataset)

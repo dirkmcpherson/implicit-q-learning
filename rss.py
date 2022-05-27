@@ -150,10 +150,11 @@ if __name__ == "__main__":
             policy.load(f"./models/{policy_file}")
 
         replay_buffer = utils.ReplayBuffer(state_dim, action_dim)
-        dataset_path ='PandaPushv2_buffer_modified_trivial.npz'
+        dataset_path = 'PandaPushv2_buffer.npz'
         # dataset_path = 'PandaPushv2_buffer_modified_I.npz' if args.altered else 'PandaPushv2_buffer.npz'
-        # if args.use_experimental_reward:
-        #     dataset_path = 'PandaPushv2_buffer_modified_IIII.npz'
+        if args.use_experimental_reward:
+            dataset_path = 'PandaPushv2_buffer_modified_IIII.npz'
+            # dataset_path ='PandaPushv2_buffer_modified_trivial.npz'
         print(f"Loading from {dataset_path}.")
         dataset = np.load(os.path.join(args.data_path, dataset_path))
 

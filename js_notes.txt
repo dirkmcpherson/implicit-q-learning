@@ -1,0 +1,11 @@
+5/27/22
+
+Reverted back to baby steps. 
+
+(1) Training on modified reward for in-distribution position from the original dataset did not work. Likely because there isn't enough data showing success around that arbitrary goal, and since the agent isn't seeing a lot of reward-yielding behavior with the cube, it doesn't learn to use it. 
+
+(2) Pretraining on the full dataset with a gaussian policy, and then continuing training on the modified-reward-dataset from (1) looks like its much more reasonable. And goes for the sparse-ish reward (concentric rings of reward around a position).  
+
+(3) same as (2) but modified-reward-dataset is the one that tries to push it off the table. That actually does look like its starting to work. Next up try to fine-tune this behavior. 
+
+running: Another fine-tuning on modified reward dataset with sparse reward based on basket goal.
