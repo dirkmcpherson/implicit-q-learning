@@ -1,7 +1,7 @@
 import numpy as np
 from IPython import embed
 
-data = np.load('PandaPushv2_buffer.npz')
+data = np.load('offline_buffers/PandaPushv2_buffer.npz')
 files_array = data.files
 # print (files_array)
 state_array = data['states']
@@ -41,7 +41,7 @@ for done_idx in done_true_idxs:
         # l_next_to_goal = np.linalg.norm(desired_terminal_state - next_state)
         # # l_final_to_goal = np.linalg.norm(desired_terminal_state - terminal_state)
 
-        if l_curr_to_goal <= 0.1:
+        if l_curr_to_goal <= 0.2:
             reward_array[i] = 0.
         else:
             reward_array[i] = -1. 
@@ -76,13 +76,18 @@ for done_idx in done_true_idxs:
 
     start_idx = done_idx+1
 
-
-
-file_name = 'PandaPushv2_buffer_modified_sparse'
+file_name = './offline_buffers/PandaPushv2_buffer_ood'
 path_to_save =  file_name + '.npz'        
-# np.savez_compressed(path_to_save, states = state_array, actions = action_array, rewards = reward_array, dones = done_array, achieved_goals = data['achieved_goals'], desired_goals = data['desired_goals'])
+
+##
+# file_name = 'PandaPushv2_buffer_no_reward'
+# path_to_save =  file_name + '.npz'        
+# print(f"ZEROING OUT ALL REWARD")
+# reward_array[:] = 0
+##
 
 
+print(f"SAVING TO {path_to_save}")
 hardcoded_desired_goals = np.ones(data["desired_goals"].shape) * desired_terminal_state 
 np.savez_compressed(path_to_save, 
                     states = state_array, 

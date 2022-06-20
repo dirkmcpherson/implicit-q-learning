@@ -1,7 +1,32 @@
-import time
 import numpy as np
 import torch
 from IPython import embed
+import gym
+import time
+
+# HARDCODED_DESIRED_GOAL = np.array([-0.1, 0.39,-0.38])
+
+# Runs policy for X episodes and returns average reward
+# A fixed seed is used for the eval environment
+def eval_policy(policy, env_name, seed, mean=0., std=1., seed_offset=0, eval_episodes=10, render=False):
+    eval_env = gym.make(env_name, render=render)
+    eval_env.seed(seed + seed_offset)
+    policy.actor.eval()
+
+    avg_reward = 0.
+    for _ in range(eval_episodes):
+        state, done = eval_env.reset(), False
+        while not done:
+            state = np.concatenate((state["observation"], state["desired_goal"]))
+            state = (np.array(state).reshape(1, -1) - mean) / std
+            action = policy.select_action(state)
+            state, reward, done, _ = eval_env.step(action)
+            avg_reward += reward
+            time.sleep(0.033)
+
+    avg_reward /= eval_episodes
+    print(f"Avg reward {avg_reward}")
+    return avg_reward
 
 class ReplayBuffer(object):
     def __init__(self, state_dim, action_dim, max_size=int(1e6)):

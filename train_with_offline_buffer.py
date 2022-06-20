@@ -1,3 +1,4 @@
+from utils import ReplayBuffer, eval_policy
 import numpy as np
 import torch
 import gym
@@ -11,11 +12,11 @@ from torch.utils.tensorboard import SummaryWriter
 import pickle
 import utils
 import IQL
-from utils import eval_policy
 from IPython import embed
+import datetime
 
-def online_finetuning(args, buffer_name, load_model_path=None):
-    comment = f"{args.comment}_onlineFT_{buffer_name}"
+def offline_train(args, buffer_name, load_model_path=None):
+    comment = f"{args.comment}_offline_train_{buffer_name}"
     writer = SummaryWriter(comment=comment)
     file_name = f"{comment}"
     offline_dataset_path = os.path.join(args.data_path, buffer_name+".npz")
@@ -60,7 +61,7 @@ def online_finetuning(args, buffer_name, load_model_path=None):
         print(f"\tLoading policy from {load_model_path}")
         policy.load(load_model_path)
 
-    # Load the offline data to get the mean and std we've previously trained under
+    # Load the offline data
     print(f"\tLoading offline data from {offline_dataset_path}")
     replay_buffer = utils.ReplayBuffer(state_dim, action_dim)
     dataset = np.load(offline_dataset_path)
@@ -74,6 +75,8 @@ def online_finetuning(args, buffer_name, load_model_path=None):
 
     n_epochs = max(1, int(args.max_timesteps) // int(args.eval_freq))
 
+    eval = eval_policy(policy, args.env, args.seed, mean, std)
+    print('initial eval: {}'.format(eval))
     for epoch in range(n_epochs):
         range_gen = tqdm(
             range(int(args.eval_freq)),
@@ -84,41 +87,26 @@ def online_finetuning(args, buffer_name, load_model_path=None):
         mean_v_loss = 0
         mean_c_loss = 0
         mean_a_loss = 0
+        for itr in range_gen:
+            info = policy.train(replay_buffer, args.batch_size)
+            mean_val += info['value']
+            mean_q += info['q_val']
+            mean_c_loss += info['critic_loss']
+            mean_v_loss += info['value_loss']
+            mean_a_loss += info['actor_loss']
+            # for key, value in info.items():
+            #     all_evaluations[key] = all_evaluations.get(key, []) + [value]
 
-        state, done = env.reset(), False
-        state = np.concatenate((state["observation"], state["desired_goal"]))
-        for itr in range_gen:                
-            # state are stored non-normalized. We pull the mean,std from the offline batch
-            # normalized_state = (np.array(state).reshape(1, -1) - mean) / std
-            # action = policy.select_action(normalized_state)
-            action = policy.select_action(state)
+        eval = eval_policy(policy, args.env, args.seed, mean, std)
 
-            next_state, reward, done, _ = env.step(action)
-            next_state = np.concatenate((next_state["observation"], next_state["desired_goal"]))
 
-            replay_buffer.add(state, action, next_state, reward, done)                
-            state = next_state
-
-            if done:
-                state, done = env.reset(), False
-                state = np.concatenate((state["observation"], state["desired_goal"]))
-
-            # if False:
-            if len(replay_buffer) > args.batch_size:
-                info = policy.train(replay_buffer, args.batch_size)
-                mean_val += info['value']
-                mean_q += info['q_val']
-                mean_c_loss += info['critic_loss']
-                mean_v_loss += info['value_loss']
-                mean_a_loss += info['actor_loss']
-
-        eval = eval_policy(policy, args.env, args.seed, mean, std)        
         writer.add_scalar('value/value', mean_val / len(range_gen), epoch)
         writer.add_scalar('value/qval', mean_q / len(range_gen), epoch)
         writer.add_scalar('Loss/value_loss', mean_v_loss / len(range_gen), epoch)
         writer.add_scalar('Loss/critic_loss', mean_c_loss / len(range_gen), epoch)
         writer.add_scalar('Loss/actor_loss', mean_a_loss / len(range_gen), epoch)
         writer.add_scalar("evaluations/eval", eval, epoch)
+        # evaluations.append(eval)
         policy.actor_scheduler.step()
         print('Epoch {}/{}: value: {:.3f}. Q: {:.3f}. value_loss: {:.3f}. critic_loss: {:.3f}. actor_loss: {:.3f} env: {:.2f}'.format(
                                                                                         epoch, n_epochs,
@@ -129,7 +117,42 @@ def online_finetuning(args, buffer_name, load_model_path=None):
                                                                                         mean_a_loss / len(range_gen),
                                                                                         eval))
         
-        
-        print(f"Writing to file {file_name}")
-        if args.save_model: policy.save(f"./models/{file_name}")
-    policy.save("./models/last")
+        if args.save_model:
+            print(f"Saving over {file_name}")
+            policy.save(f"./models/{file_name}")
+
+    return f"./models/{file_name}"
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    # Experiment
+    parser.add_argument("--policy", default="IQL")  # Policy name
+    parser.add_argument("--data_path", default="/home/j/workspace/implicit-q-learning/offline_buffers")
+    parser.add_argument("--env", default="PandaPush-v2")  # OpenAI gym environment name
+    parser.add_argument("--seed", default=1, type=int)  # Sets Gym, PyTorch and Numpy seeds
+    parser.add_argument("--eval_freq", default=1e4, type=int)  # How often (time steps) we evaluate
+    parser.add_argument("--max_timesteps", default=2e5, type=int)  # Max time steps to run environment
+    parser.add_argument("--save_model", default=True)  # Save model and optimizer parameters
+    parser.add_argument("--load_model", default="")  # Model load file name, "" doesn't load, "default" uses file_name
+    # IQL
+    parser.add_argument("--batch_size", default=256, type=int)  # Batch size for both actor and critic
+    parser.add_argument("--discount", default=0.99)  # Discount factor
+    parser.add_argument("--tau", default=0.005)  # Target network update rate
+    parser.add_argument("--expectile", default=0.8)  # Expectile parameter Tau
+    parser.add_argument("--beta", default=3.0)  # Temperature parameter Beta
+    parser.add_argument("--max_weight", default=100.0)  # Max weight for actor update
+    parser.add_argument("--normalize_data", default=True)
+    parser.add_argument("--deterministic", action="store_true")
+    parser.add_argument("--run_slot", type=int, default=-1)
+    parser.add_argument("--altered", default=True)
+    parser.add_argument("--use_experimental_reward", action="store_true")
+    parser.add_argument("--comment", default="")
+    args = parser.parse_args()
+
+    datestring = f"{datetime.datetime.now().strftime('%m-%d_%H-%M')}"
+    args.deterministic = True
+    args.comment += f"deterministic_{datestring}"
+    args.max_timesteps = 3e5
+
+    ## Train in the default environment with a offline buffer that has no reward
+    trained_policy_path = offline_train(args, "PandaPushv2_buffer")
