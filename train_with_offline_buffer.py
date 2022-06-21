@@ -150,9 +150,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     datestring = f"{datetime.datetime.now().strftime('%m-%d_%H-%M')}"
-    args.deterministic = True
-    args.comment += f"deterministic_{datestring}"
-    args.max_timesteps = 3e5
+    args.comment += f"deterministic_{datestring}" if args.deterministic else f"{datestring}"
+    args.max_timesteps = 5e5
 
     ## Train in the default environment with a offline buffer that has no reward
     trained_policy_path = offline_train(args, "PandaPushv2_buffer")

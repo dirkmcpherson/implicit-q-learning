@@ -20,6 +20,7 @@ if __name__ == "__main__":
     parser.add_argument("--expectile", default=0.8)  # Expectile parameter Tau
     parser.add_argument("--beta", default=3.0)  # Temperature parameter Beta
     parser.add_argument("--max_weight", default=100.0)  # Max weight for actor update
+    parser.add_argument("--deterministic", action="store_true")
     args = parser.parse_args()
 
 
@@ -51,7 +52,7 @@ if __name__ == "__main__":
         "actor_hidden": hidden,
         "critic_hidden": hidden,
         "value_hidden": hidden,
-        "deterministic_policy": False,
+        "deterministic_policy": args.deterministic,
     }
 
     # Initialize policy
