@@ -9,3 +9,16 @@ Reverted back to baby steps.
 (3) same as (2) but modified-reward-dataset is the one that tries to push it off the table. That actually does look like its starting to work. Next up try to fine-tune this behavior. 
 
 running: Another fine-tuning on modified reward dataset with sparse reward based on basket goal.
+
+
+6/26/22
+
+I) Does online IQL learn in either the new or old environment w/o an offline buffer (meaning it also doesn't normalize actions around mean=0 std=1)
+
+We ran this configuration to test whether online learning was possible with IQL since we're uncertain whether our fine-tuning step is where learning fails. This should be repeated with a mean and std set by the offline dataset. So that would make four configurations:
+    i) Original environment w/o stat/action regularization
+    ii) Modified Environment ""
+    iii) Original environment w/previous data used to regularize state/actions
+    iv) Modified Environment ""
+
+    expect (iii) to do best followed by (i) (ii) and (iv) 

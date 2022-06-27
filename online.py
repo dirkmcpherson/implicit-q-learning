@@ -18,7 +18,6 @@ def online_finetuning(args, buffer_name, load_model_path=None):
     comment = f"{args.comment}_onlineFT_{buffer_name}"
     writer = SummaryWriter(comment=comment)
     file_name = f"{comment}"
-    offline_dataset_path = os.path.join(args.data_path, buffer_name+".npz")
     print("---------------------------------------")
     print(f"Policy: {args.policy}, Env: {args.env}, Seed: {args.seed}")
     print("---------------------------------------")
@@ -61,15 +60,20 @@ def online_finetuning(args, buffer_name, load_model_path=None):
         policy.load(load_model_path)
 
     # Load the offline data to get the mean and std we've previously trained under
-    print(f"\tLoading offline data from {offline_dataset_path}")
+    
     replay_buffer = utils.ReplayBuffer(state_dim, action_dim)
-    dataset = np.load(offline_dataset_path)
-    replay_buffer.convert_npz(dataset)
-    print(f"\t\tOffline dataset size: {len(replay_buffer)}")
+    if buffer_name:
+        offline_dataset_path = os.path.join(args.data_path, buffer_name+".npz")
+        print(f"\tLoading offline data from {offline_dataset_path}")
+        dataset = np.load(offline_dataset_path)
+        replay_buffer.convert_npz(dataset)
+        print(f"\t\tOffline dataset size: {len(replay_buffer)}")
+        args.normalize_data = False
 
     if args.normalize_data:
         mean, std = replay_buffer.normalize_states()
     else:
+        print(f"Not normalizing data.")
         mean, std = 0, 1
 
     n_epochs = max(1, int(args.max_timesteps) // int(args.eval_freq))
@@ -133,3 +137,41 @@ def online_finetuning(args, buffer_name, load_model_path=None):
         print(f"Writing to file {file_name}")
         if args.save_model: policy.save(f"./models/{file_name}")
     policy.save("./models/last")
+
+
+if __name__ == "__main__":
+    import argparse
+    import datetime
+    parser = argparse.ArgumentParser()
+    # Experiment
+    parser.add_argument("--policy", default="IQL")  # Policy name
+    parser.add_argument("--data_path", default="/home/j/workspace/implicit-q-learning/offline_buffers")
+    parser.add_argument("--buffer", default="PandaPushv2_buffer")
+    parser.add_argument("--env", default="PandaPush-v2")  # OpenAI gym environment name
+    parser.add_argument("--mod", action="store_true")
+    parser.add_argument("--seed", default=1, type=int)  # Sets Gym, PyTorch and Numpy seeds
+    parser.add_argument("--eval_freq", default=1e4, type=int)  # How often (time steps) we evaluate
+    parser.add_argument("--max_timesteps", default=2e5, type=int)  # Max time steps to run environment
+    parser.add_argument("--save_model", default=True)  # Save model and optimizer parameters
+    parser.add_argument("--load_model", default="")  # Model load file name, "" doesn't load, "default" uses file_name
+    # IQL
+    parser.add_argument("--batch_size", default=256, type=int)  # Batch size for both actor and critic
+    parser.add_argument("--discount", default=0.99)  # Discount factor
+    parser.add_argument("--tau", default=0.005)  # Target network update rate
+    parser.add_argument("--expectile", default=0.8)  # Expectile parameter Tau
+    parser.add_argument("--beta", default=3.0)  # Temperature parameter Beta
+    parser.add_argument("--max_weight", default=100.0)  # Max weight for actor update
+    parser.add_argument("--normalize_data", default=True)
+    parser.add_argument("--deterministic", action="store_true")
+    parser.add_argument("--run_slot", type=int, default=-1)
+    parser.add_argument("--comment", default="")
+    args = parser.parse_args()
+
+    if (args.mod):
+        args.env = "PandaPushModified-v2"
+        args.comment += "MOD"
+
+    datestring = f"{datetime.datetime.now().strftime('%m-%d_%H-%M-%S')}"
+    args.comment += f"{datestring}"
+
+    online_finetuning(args, args.buffer, None)
