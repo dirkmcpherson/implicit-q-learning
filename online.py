@@ -1,3 +1,4 @@
+from PPO import PPO
 import numpy as np
 import torch
 import gym
@@ -38,43 +39,48 @@ def online_finetuning(args, buffer_name, load_model_path=None):
 
     hidden = (256, 256)
 
-    kwargs = {
-        "state_dim": state_dim,
-        "action_dim": action_dim,
-        "max_action": max_action,
-        "discount": args.discount,
-        "tau": args.tau,
-        "expectile": args.expectile,
-        "beta": args.beta,
-        "max_weight": args.max_weight,
-        "actor_hidden": hidden,
-        "critic_hidden": hidden,
-        "value_hidden": hidden,
-        "deterministic_policy": args.deterministic,
-    }
+    mean, std = 0, 1
+    if args.policy == "IQL":
+        kwargs = {
+            "state_dim": state_dim,
+            "action_dim": action_dim,
+            "max_action": max_action,
+            "discount": args.discount,
+            "tau": args.tau,
+            "expectile": args.expectile,
+            "beta": args.beta,
+            "max_weight": args.max_weight,
+            "actor_hidden": hidden,
+            "critic_hidden": hidden,
+            "value_hidden": hidden,
+            "deterministic_policy": args.deterministic,
+        }
 
-    # Initialize policy
-    policy = IQL.IQL(**kwargs)
-    if load_model_path is not None:
-        print(f"\tLoading policy from {load_model_path}")
-        policy.load(load_model_path)
+        # Initialize policy
+        policy = IQL.IQL(**kwargs)
+        if load_model_path is not None:
+            print(f"\tLoading policy from {load_model_path}")
+            policy.load(load_model_path)
 
-    # Load the offline data to get the mean and std we've previously trained under
-    
-    replay_buffer = utils.ReplayBuffer(state_dim, action_dim)
-    if buffer_name:
-        offline_dataset_path = os.path.join(args.data_path, buffer_name+".npz")
-        print(f"\tLoading offline data from {offline_dataset_path}")
-        dataset = np.load(offline_dataset_path)
-        replay_buffer.convert_npz(dataset)
-        print(f"\t\tOffline dataset size: {len(replay_buffer)}")
-        args.normalize_data = False
+        # Load the offline data to get the mean and std we've previously trained under
+        
+        replay_buffer = utils.ReplayBuffer(state_dim, action_dim)
+        if buffer_name:
+            offline_dataset_path = os.path.join(args.data_path, buffer_name+".npz")
+            print(f"\tLoading offline data from {offline_dataset_path}")
+            dataset = np.load(offline_dataset_path)
+            replay_buffer.convert_npz(dataset)
+            print(f"\t\tOffline dataset size: {len(replay_buffer)}")
+            args.normalize_data = False
 
-    if args.normalize_data:
-        mean, std = replay_buffer.normalize_states()
-    else:
-        print(f"Not normalizing data.")
-        mean, std = 0, 1
+        if args.normalize_data:
+            mean, std = replay_buffer.normalize_states()
+            print(f"Normalizing data.")
+        else:
+            print(f"Not normalizing data.")
+    elif args.policy == "PPO":
+        policy = PPO(**kwargs)
+        raise NotImplementedError()
 
     n_epochs = max(1, int(args.max_timesteps) // int(args.eval_freq))
 
@@ -150,7 +156,7 @@ if __name__ == "__main__":
     parser.add_argument("--env", default="PandaPush-v2")  # OpenAI gym environment name
     parser.add_argument("--mod", action="store_true")
     parser.add_argument("--seed", default=1, type=int)  # Sets Gym, PyTorch and Numpy seeds
-    parser.add_argument("--eval_freq", default=1e4, type=int)  # How often (time steps) we evaluate
+    parser.add_argument("--eval_freq", default=5e3, type=int)  # How often (time steps) we evaluate
     parser.add_argument("--max_timesteps", default=2e5, type=int)  # Max time steps to run environment
     parser.add_argument("--save_model", default=True)  # Save model and optimizer parameters
     parser.add_argument("--load_model", default="")  # Model load file name, "" doesn't load, "default" uses file_name
@@ -164,14 +170,23 @@ if __name__ == "__main__":
     parser.add_argument("--normalize_data", default=True)
     parser.add_argument("--deterministic", action="store_true")
     parser.add_argument("--run_slot", type=int, default=-1)
+    parser.add_argument("--n_runs", type=int, default=1)
     parser.add_argument("--comment", default="")
     args = parser.parse_args()
 
     if (args.mod):
         args.env = "PandaPushModified-v2"
         args.comment += "MOD"
+    else:
+        args.comment += "NORM"
 
-    datestring = f"{datetime.datetime.now().strftime('%m-%d_%H-%M-%S')}"
-    args.comment += f"{datestring}"
+    # args.buffer = None
+    if args.buffer == None:
+        args.comment += "NOREG"
+    else:
+        args.comment += "REG"
 
-    online_finetuning(args, args.buffer, None)
+    for i in range(args.n_runs):
+        datestring = f"{datetime.datetime.now().strftime('%m-%d_%H-%M-%S')}"
+        args.comment += f"{datestring}"
+        online_finetuning(args, args.buffer, None)
